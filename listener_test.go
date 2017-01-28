@@ -1,6 +1,7 @@
 package fastTCP_test
 
 import (
+	"fmt"
 	"github.com/JoeReid/fastTCP"
 	"io"
 	"net"
@@ -37,7 +38,40 @@ func testOnce(t *testing.T) {
 	}
 }
 
-func TestTCP(t *testing.T) {
+type serverLogger struct {
+	t *testing.T
+}
+
+func (s *serverLogger) Printf(format string, v ...interface{}) {
+	s.t.Log(fmt.Sprintf(format, v...))
+}
+
+func (s *serverLogger) Println(v ...interface{}) {
+	s.t.Log(v...)
+}
+
+func TestServerStop(t *testing.T) {
+	fastTCP.Logger = &serverLogger{t}
+
+	for i := 0; i < 5; i++ {
+		server := fastTCP.NewServer(":6543", testHandler, fastTCP.TCPOptions{})
+		go func() {
+			err := server.ListenTCP()
+			if err != nil {
+				panic(err)
+			}
+		}()
+
+		time.Sleep(50 * time.Millisecond)
+
+		server.Stop()
+		time.Sleep(time.Millisecond)
+	}
+}
+
+func TestTCPDefault(t *testing.T) {
+	fastTCP.Logger = &serverLogger{t}
+
 	server := fastTCP.NewServer(":6543", testHandler, fastTCP.TCPOptions{})
 	go func() {
 		err := server.ListenTCP()
@@ -45,16 +79,195 @@ func TestTCP(t *testing.T) {
 			panic(err)
 		}
 	}()
+	defer server.Stop()
 
 	t.Log("This test is not a load test")
 	t.Log("time values may be incorrect")
 	t.Log("this routine is too slow to test the load on the network code")
 
-	time.Sleep(time.Second)
+	time.Sleep(50 * time.Millisecond)
 
-	t.Run("TCP one connection", func(t *testing.T) {
-		testOnce(t)
+	t.Run("TCP one connection", testMultiple(1))
+	t.Run("TCP ten connection", testMultiple(10))
+	t.Run("TCP hundred connection", testMultiple(100))
+}
+
+func TestTCPDefaultIPv6(t *testing.T) {
+	fastTCP.Logger = &serverLogger{t}
+
+	server := fastTCP.NewServer(":6543", testHandler, fastTCP.TCPOptions{
+		IPv6: true,
 	})
+	go func() {
+		err := server.ListenTCP()
+		if err != nil {
+			panic(err)
+		}
+	}()
+	defer server.Stop()
+
+	t.Log("This test is not a load test")
+	t.Log("time values may be incorrect")
+	t.Log("this routine is too slow to test the load on the network code")
+
+	time.Sleep(50 * time.Millisecond)
+
+	t.Run("TCP one connection", testMultiple(1))
+	t.Run("TCP ten connection", testMultiple(10))
+	t.Run("TCP hundred connection", testMultiple(100))
+}
+
+func TestTCPDeferAccept(t *testing.T) {
+	fastTCP.Logger = &serverLogger{t}
+
+	server := fastTCP.NewServer(":6543", testHandler, fastTCP.TCPOptions{
+		DeferAccept: true,
+	})
+	go func() {
+		err := server.ListenTCP()
+		if err != nil {
+			panic(err)
+		}
+	}()
+	defer server.Stop()
+
+	t.Log("This test is not a load test")
+	t.Log("time values may be incorrect")
+	t.Log("this routine is too slow to test the load on the network code")
+
+	time.Sleep(50 * time.Millisecond)
+
+	t.Run("TCP one connection", testMultiple(1))
+	t.Run("TCP ten connection", testMultiple(10))
+	t.Run("TCP hundred connection", testMultiple(100))
+}
+
+func TestTCPDeferAcceptIPv6(t *testing.T) {
+	fastTCP.Logger = &serverLogger{t}
+
+	server := fastTCP.NewServer(":6543", testHandler, fastTCP.TCPOptions{
+		DeferAccept: true,
+		IPv6:        true,
+	})
+	go func() {
+		err := server.ListenTCP()
+		if err != nil {
+			panic(err)
+		}
+	}()
+	defer server.Stop()
+
+	t.Log("This test is not a load test")
+	t.Log("time values may be incorrect")
+	t.Log("this routine is too slow to test the load on the network code")
+
+	time.Sleep(50 * time.Millisecond)
+
+	t.Run("TCP one connection", testMultiple(1))
+	t.Run("TCP ten connection", testMultiple(10))
+	t.Run("TCP hundred connection", testMultiple(100))
+}
+
+func TestTCPFastOpen(t *testing.T) {
+	fastTCP.Logger = &serverLogger{t}
+
+	server := fastTCP.NewServer(":6543", testHandler, fastTCP.TCPOptions{
+		FastOpen: true,
+	})
+	go func() {
+		err := server.ListenTCP()
+		if err != nil {
+			panic(err)
+		}
+	}()
+	defer server.Stop()
+
+	t.Log("This test is not a load test")
+	t.Log("time values may be incorrect")
+	t.Log("this routine is too slow to test the load on the network code")
+
+	time.Sleep(50 * time.Millisecond)
+
+	t.Run("TCP one connection", testMultiple(1))
+	t.Run("TCP ten connection", testMultiple(10))
+	t.Run("TCP hundred connection", testMultiple(100))
+}
+
+func TestTCPFastOpenIPv6(t *testing.T) {
+	fastTCP.Logger = &serverLogger{t}
+
+	server := fastTCP.NewServer(":6543", testHandler, fastTCP.TCPOptions{
+		FastOpen: true,
+		IPv6:     true,
+	})
+	go func() {
+		err := server.ListenTCP()
+		if err != nil {
+			panic(err)
+		}
+	}()
+	defer server.Stop()
+
+	t.Log("This test is not a load test")
+	t.Log("time values may be incorrect")
+	t.Log("this routine is too slow to test the load on the network code")
+
+	time.Sleep(50 * time.Millisecond)
+
+	t.Run("TCP one connection", testMultiple(1))
+	t.Run("TCP ten connection", testMultiple(10))
+	t.Run("TCP hundred connection", testMultiple(100))
+}
+
+func TestTCPDeferAcceptFastOpen(t *testing.T) {
+	fastTCP.Logger = &serverLogger{t}
+
+	server := fastTCP.NewServer(":6543", testHandler, fastTCP.TCPOptions{
+		DeferAccept: true,
+		FastOpen:    true,
+	})
+	go func() {
+		err := server.ListenTCP()
+		if err != nil {
+			panic(err)
+		}
+	}()
+	defer server.Stop()
+
+	t.Log("This test is not a load test")
+	t.Log("time values may be incorrect")
+	t.Log("this routine is too slow to test the load on the network code")
+
+	time.Sleep(50 * time.Millisecond)
+
+	t.Run("TCP one connection", testMultiple(1))
+	t.Run("TCP ten connection", testMultiple(10))
+	t.Run("TCP hundred connection", testMultiple(100))
+}
+
+func TestTCPDeferAcceptFastOpenIPv6(t *testing.T) {
+	fastTCP.Logger = &serverLogger{t}
+
+	server := fastTCP.NewServer(":6543", testHandler, fastTCP.TCPOptions{
+		DeferAccept: true,
+		FastOpen:    true,
+		IPv6:        true,
+	})
+	go func() {
+		err := server.ListenTCP()
+		if err != nil {
+			panic(err)
+		}
+	}()
+	defer server.Stop()
+
+	t.Log("This test is not a load test")
+	t.Log("time values may be incorrect")
+	t.Log("this routine is too slow to test the load on the network code")
+
+	time.Sleep(50 * time.Millisecond)
+
+	t.Run("TCP one connection", testMultiple(1))
 	t.Run("TCP ten connection", testMultiple(10))
 	t.Run("TCP hundred connection", testMultiple(100))
 }

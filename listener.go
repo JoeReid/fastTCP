@@ -13,6 +13,7 @@ import (
 // custom logger to this package.
 type Printer interface {
 	Printf(format string, v ...interface{})
+	Println(v ...interface{})
 }
 
 // Logger is a custom logger to use for this package. Logger is nil by default.
@@ -22,21 +23,28 @@ var Logger Printer
 // socket listener.
 //
 // DeferAccept corresponds to the TCP_DEFER_ACCEPT flag. If true the listener
-// will set up the socket for this behaviour. See
-// http://man7.org/linux/man-pages/man7/tcp.7.html for details
+// will set up the socket for this behaviour.See
+// http://man7.org/linux/man-pages/man7/tcp.7.html for details.
+//
+// Do not use the DeferAccept flag unless the server reads from the client
+// before writing or it will cause the thread to hang.
 //
 // FastOpen corresponds to the TCP_FASTOPEN flag. If true the listener will set
 // up the socket for this behaviour. See https://lwn.net/Articles/508865/ for
 // details.
+//
+// IPv6 sets if the listener uses IPv6 or IPv4
 type TCPOptions struct {
 	DeferAccept bool
 	FastOpen    bool
+	IPv6        bool
 }
 
 type Server struct {
 	laddr   string
 	handler func(io.ReadWriter)
 	options TCPOptions
+	close   chan struct{}
 }
 
 // NewServer returns a new Server instance configured to serve on a given local
@@ -61,7 +69,25 @@ func NewServer(laddr string, handler func(io.ReadWriter), options TCPOptions) *S
 		laddr:   laddr,
 		handler: handler,
 		options: options,
+		close:   make(chan struct{}),
 	}
+}
+
+// Stop closes all the active listeners to shutdown the server
+func (t *Server) Stop() {
+	if Logger != nil {
+		Logger.Println("Stopping TCP server")
+	}
+
+	close(t.close)
+}
+
+func (s *Server) network() string {
+	if s.options.IPv6 {
+		return "tcp6"
+	}
+
+	return "tcp4"
 }
 
 // spawnListener returns a new net.Listener built with the performance tweaks
@@ -73,7 +99,7 @@ func (t *Server) spawnListener() (net.Listener, error) {
 		FastOpen:    t.options.FastOpen,
 	}
 
-	return conf.NewListener("tcp", t.laddr)
+	return conf.NewListener(t.network(), t.laddr)
 }
 
 // canReusePort attempts to test if the OS can use the SO_REUSEPORT socket
@@ -84,7 +110,7 @@ func (t *Server) canReusePort() (bool, error) {
 		ReusePort: true,
 	}
 
-	ln, err := conf.NewListener("tcp", t.laddr)
+	ln, err := conf.NewListener(t.network(), t.laddr)
 	if err != nil {
 		if strings.Contains(err.Error(), "SO_REUSEPORT") {
 			return false, nil
@@ -145,18 +171,18 @@ func (t *Server) ListenTCP() error {
 		}
 	}
 
+	p := runtime.NumCPU()
+
+	// Create channel with buffer size equal to number of listeners to
+	// prevent hanging serveTCP go routines after one has errored
+	errorChan := make(chan error, p)
+
 	// We can run multiple listeners (one per CPU) because the OS supports the
 	// SO_REUSEPORT socket option
 	if reuse {
 		if Logger != nil {
 			Logger.Printf("Starting paralell listener")
 		}
-
-		p := runtime.NumCPU()
-
-		// Create channel with buffer size equal to number of listeners to
-		// prevent hanging serveTCP go routines after one has errored
-		errorChan := make(chan error, p)
 
 		// Spawn listeners for each CPU and pass them to serveTCP
 		for i := 0; i < p; i++ {
@@ -180,25 +206,29 @@ func (t *Server) ListenTCP() error {
 			// Start the server on this listener
 			go t.serveTCP(ln, errorChan)
 		}
+	} else {
 
-		// Wait for one of the listeners to errorn then return
-		// The defer statements should clear up the other listeners
-		return <-errorChan
+		// OS does not support the SO_REUSEPORT socket option se we have to use the
+		// stdlib single thread listener
+		if Logger != nil {
+			Logger.Println("Starting single listener")
+		}
+
+		ln, err := net.Listen(t.network(), t.laddr)
+		if err != nil {
+			return err
+		}
+		defer ln.Close()
+
+		go t.serveTCP(ln, errorChan)
 	}
 
-	// OS does not support the SO_REUSEPORT socket option se we have to use the
-	// stdlib single thread listener
-	if Logger != nil {
-		Logger.Printf("Starting single listener")
-	}
-
-	ln, err := net.Listen("tcp", t.laddr)
-	if err != nil {
+	// Wait for one of the listeners to error or we are stopped then return
+	// The defer statements should clear up the other listeners
+	select {
+	case err := <-errorChan:
 		return err
+	case <-t.close:
+		return nil
 	}
-	defer ln.Close()
-
-	errorChan := make(chan error)
-	go t.serveTCP(ln, errorChan)
-	return <-errorChan
 }
