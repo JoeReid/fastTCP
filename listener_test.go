@@ -27,13 +27,13 @@ func testOnce(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var recieved = make([]byte, len(testData))
-	_, err = conn.Read(recieved)
+	var received = make([]byte, len(testData))
+	_, err = conn.Read(received)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if testData != string(recieved) {
+	if testData != string(received) {
 		t.Fatalf("Strings not equal")
 	}
 }

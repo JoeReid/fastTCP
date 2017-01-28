@@ -10,7 +10,7 @@ import (
 // activeConnections is the number of tcp connections currently open. This
 // value is atomicly incremented and decremented when new tcp connections are
 // handled by the manageTCP function
-var activeConnections int32 = 0
+var activeConnections int32
 
 // osThreads is the number of OS threads the applcation should be able to use,
 // see runtime.GOMAXPROCS() for clarification on this behaviour.
@@ -46,7 +46,7 @@ func manageTCP(conn net.Conn, handler func(io.ReadWriter)) {
 	conCount := atomic.AddInt32(&activeConnections, 1)
 	defer atomic.AddInt32(&activeConnections, -1)
 
-	// Check there are enough OS threads then lock the thread in preperation for
+	// Check there are enough OS threads then lock the thread in preparation for
 	//blocking IO
 	updateThreads(int(conCount))
 	runtime.LockOSThread()

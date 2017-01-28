@@ -8,7 +8,7 @@ A highly optimised TCP listener/server system for golang taking inspiration from
 
 ## Performance tunings
 The default standard library [net.Listener](https://golang.org/pkg/net/#Listener) listens for new TCP connections on one thread.
-However on Linux kernel versions > 3.9 the SO_REUSEPORT port flag can be set to allow multiple threads to serve connections simultaneously.
+However on Linux kernel versions >= 3.9 the SO_REUSEPORT port flag can be set to allow multiple threads to serve connections simultaneously.
 This is done with the help of [this](https://github.com/valyala/tcplisten) project.
 
 This alternative TCP listener also supports use of the TCP_DEFER_ACCEPT flag which can be used to aid performance

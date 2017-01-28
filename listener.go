@@ -40,6 +40,11 @@ type TCPOptions struct {
 	IPv6        bool
 }
 
+// Server is the high performance TCP server.
+// When built by The NewServer function the server is not started and a call to
+// Server.ListenTCP is needed.
+// Server.Stop can be called to halt all of the listeners and shut down the
+// server.
 type Server struct {
 	laddr   string
 	handler func(io.ReadWriter)
@@ -74,12 +79,12 @@ func NewServer(laddr string, handler func(io.ReadWriter), options TCPOptions) *S
 }
 
 // Stop closes all the active listeners to shutdown the server
-func (t *Server) Stop() {
+func (s *Server) Stop() {
 	if Logger != nil {
 		Logger.Println("Stopping TCP server")
 	}
 
-	close(t.close)
+	close(s.close)
 }
 
 func (s *Server) network() string {
@@ -92,31 +97,31 @@ func (s *Server) network() string {
 
 // spawnListener returns a new net.Listener built with the performance tweaks
 // defined in t.options.
-func (t *Server) spawnListener() (net.Listener, error) {
+func (s *Server) spawnListener() (net.Listener, error) {
 	conf := &tcplisten.Config{
 		ReusePort:   true,
-		DeferAccept: t.options.DeferAccept,
-		FastOpen:    t.options.FastOpen,
+		DeferAccept: s.options.DeferAccept,
+		FastOpen:    s.options.FastOpen,
 	}
 
-	return conf.NewListener(t.network(), t.laddr)
+	return conf.NewListener(s.network(), s.laddr)
 }
 
 // canReusePort attempts to test if the OS can use the SO_REUSEPORT socket
-// option. It does this by atempting to create a new net.Listener configured
+// option. It does this by attempting to create a new net.Listener configured
 // with that flag set.
-func (t *Server) canReusePort() (bool, error) {
+func (s *Server) canReusePort() (bool, error) {
 	conf := &tcplisten.Config{
 		ReusePort: true,
 	}
 
-	ln, err := conf.NewListener(t.network(), t.laddr)
+	ln, err := conf.NewListener(s.network(), s.laddr)
 	if err != nil {
 		if strings.Contains(err.Error(), "SO_REUSEPORT") {
 			return false, nil
 		}
 
-		return false, err // unkown if can use
+		return false, err // unknown useable
 	}
 
 	ln.Close()
@@ -128,7 +133,7 @@ func (t *Server) canReusePort() (bool, error) {
 // temporary network error. If it is the routine sleeps for one millisecond
 // before continuing, otherwise it sends the error to the provided errorChan
 // and returns
-func (t *Server) serveTCP(ln net.Listener, errorChan chan error) {
+func (s *Server) serveTCP(ln net.Listener, errorChan chan error) {
 	var errorWait = time.Millisecond
 
 	for {
@@ -156,12 +161,14 @@ func (t *Server) serveTCP(ln net.Listener, errorChan chan error) {
 		}
 
 		// Handle the new connection
-		go manageTCP(conn, t.handler)
+		go manageTCP(conn, s.handler)
 	}
 }
 
-func (t *Server) ListenTCP() error {
-	reuse, err := t.canReusePort()
+// ListenTCP starts the TCP server listeners and starts to process new
+// connections
+func (s *Server) ListenTCP() error {
+	reuse, err := s.canReusePort()
 	if err != nil {
 		if Logger != nil {
 			Logger.Printf(
@@ -181,12 +188,12 @@ func (t *Server) ListenTCP() error {
 	// SO_REUSEPORT socket option
 	if reuse {
 		if Logger != nil {
-			Logger.Printf("Starting paralell listener")
+			Logger.Printf("Starting parallel listener")
 		}
 
 		// Spawn listeners for each CPU and pass them to serveTCP
 		for i := 0; i < p; i++ {
-			ln, err := t.spawnListener()
+			ln, err := s.spawnListener()
 
 			// Log the failure if we have a logger then continue to spawn more
 			if err != nil {
@@ -204,7 +211,7 @@ func (t *Server) ListenTCP() error {
 			defer ln.Close()
 
 			// Start the server on this listener
-			go t.serveTCP(ln, errorChan)
+			go s.serveTCP(ln, errorChan)
 		}
 	} else {
 
@@ -214,13 +221,13 @@ func (t *Server) ListenTCP() error {
 			Logger.Println("Starting single listener")
 		}
 
-		ln, err := net.Listen(t.network(), t.laddr)
+		ln, err := net.Listen(s.network(), s.laddr)
 		if err != nil {
 			return err
 		}
 		defer ln.Close()
 
-		go t.serveTCP(ln, errorChan)
+		go s.serveTCP(ln, errorChan)
 	}
 
 	// Wait for one of the listeners to error or we are stopped then return
@@ -228,7 +235,7 @@ func (t *Server) ListenTCP() error {
 	select {
 	case err := <-errorChan:
 		return err
-	case <-t.close:
+	case <-s.close:
 		return nil
 	}
 }
