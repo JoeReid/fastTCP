@@ -1,3 +1,7 @@
+[![Build Status](https://travis-ci.org/JoeReid/fastTCP.svg)](https://travis-ci.org/JoeReid/fastTCP)
+[![GoDoc](https://godoc.org/github.com/JoeReid/fastTCP?status.svg)](http://godoc.org/github.com/JoeReid/fastTCP)
+[![Go Report](https://goreportcard.com/badge/github.com/JoeReid/fastTCP)](https://goreportcard.com/report/github.com/JoeReid/fastTCP)
+
 # fastTCP
 A highly optimised TCP listener/server system for golang taking inspiration from the performance tweaks in
 [tcplisten](https://github.com/valyala/tcplisten) and the go-blocking server in [volley](https://github.com/jonhoo/volley).
