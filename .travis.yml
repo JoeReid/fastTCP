@@ -4,4 +4,5 @@ go:
 
 script:
     - go test -v ./...
-    - cd examples/echoServer && go build
+    - cd $HOME/gopath/src/github.com/JoeReid/fastTCP/examples/echoServer && go build
+    - cd $HOME/gopath/src/github.com/JoeReid/fastTCP/examples/http && go build

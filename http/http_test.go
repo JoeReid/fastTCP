@@ -17,7 +17,7 @@ func TestHTTP(t *testing.T) {
 		}),
 	)
 
-	server := fastTCP.NewServer(":6543", hs.NewConn, fastTCP.TCPOptions{})
+	server := fastTCP.NewServer(":6544", hs.NewConn, fastTCP.TCPOptions{})
 	go func() {
 		err := server.ListenTCP()
 		if err != nil {
@@ -27,7 +27,7 @@ func TestHTTP(t *testing.T) {
 
 	time.Sleep(50 * time.Millisecond)
 
-	resp, err := goHTTP.Get("http://localhost:6543/")
+	resp, err := goHTTP.Get("http://localhost:6544/")
 	if err != nil {
 		t.Log(err)
 	}
